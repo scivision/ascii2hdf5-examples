@@ -3,10 +3,11 @@ plot HDF5 proprietary data converted by ascii2hdf5.py
 """
 
 from pathlib import Path
+import argparse
 import h5py
 import numpy as np
-from matplotlib.pyplot import figure, show
-import argparse
+from matplotlib.pyplot import subplots, show
+from matplotlib.colors import LogNorm
 
 
 def plot(dat: np.ndarray):
@@ -15,8 +16,11 @@ def plot(dat: np.ndarray):
 
     # a priori
     Naz = 20
+    boundsAz = (-32.0, 32.0)
     Nspeed = 64
+    boundsSpeed = (0.0, 20.0)
     Nel = 20
+    boundsEl = (-32.0, 32.0)
 
     if dat.shape != (Naz, Nel, Nspeed):
         raise ValueError(f"Expected shape {Naz, Nel, Nspeed}")
@@ -24,15 +28,23 @@ def plot(dat: np.ndarray):
     iel = Nel // 2 - 1  # 0 degrees
     iaz = Naz // 2 - 1  # 0 degrees
 
-    Az = np.linspace(-32, 32, Naz)
-    El = np.linspace(-32, 32, Nel)
-    speed = np.linspace(0, 20, Nspeed)
+    Az = np.linspace(*boundsAz, Naz)
+    El = np.linspace(*boundsEl, Nel)
+    speed = np.linspace(*boundsSpeed, Nspeed)
 
-    # fg = figure(subplot_kw={'projection': 'polar'})
-    fg = figure()
-    ax = fg.subplots(nrows=1, ncols=2)
-    ax[0].pcolormesh(speed, Az, dat[:, iel, :], shading="nearest")
-    ax[1].pcolormesh(speed, El, dat[iaz, :, :], shading="nearest")
+    fg, ax = subplots(nrows=1, ncols=2, subplot_kw=dict(projection="polar"))
+
+    h = ax[0].pcolormesh(np.radians(Az), speed, dat[iel, :, :].T, shading="nearest", norm=LogNorm())
+    ax[0].set_thetalim(thetamin=boundsAz[0], thetamax=boundsAz[1])
+    ax[0].set_xlabel("speed [km/sec]", rotation=boundsAz[0])
+    fg.colorbar(h, ax=ax[0], shrink=0.25)
+
+    h = ax[1].pcolormesh(np.radians(El), speed, dat[:, iaz, :].T, shading="nearest", norm=LogNorm())
+    ax[1].set_thetalim(thetamin=boundsEl[0], thetamax=boundsEl[1])
+    ax[1].set_xlabel("speed [km/sec]", rotation=boundsEl[0])
+    fg.colorbar(h, ax=ax[1], shrink=0.25)
+
+    fg.suptitle(filename.stem)
 
 
 if __name__ == "__main__":
