@@ -13,42 +13,68 @@ HDF5 file is 27.6kB uncompressed--a little fixed overhead due to HDF5 internal s
 Expected raw data size would be 20 * 20 * 64 * 1 bytes = 25.6 kB
 """
 
+import argparse
 from pathlib import Path
 import re
 import numpy as np
 import h5py
 
-# a priori
-Nel = 20
-Naz = 20
-Nbin = 64
 
-fn = Path("C_N_in72920.0_T_in6898.9_U_in7871.1_Nratio0.0.txt")
-fnout = fn.with_suffix(".h5")
+def read_text(filename: Path) -> np.ndarray:
+    """
+    read ASCII data from file
+    """
 
-dat = np.empty((Naz, Nel, Nbin), dtype=np.uint8)
+    # a priori
+    Nel = 20
+    Naz = 20
+    Nbin = 64
 
-bpat = re.compile(r"(?<=azimuth_bin\=)\d+")
-dpat = re.compile(r"(?<=\[)((\d+\s*){20})(?=])")
+    filename = Path(filename).expanduser()
 
-iaz = 0
-i = 0
-with open(fn) as f:
-    for line in f:
-        if m := bpat.search(line):
-            iaz = int(m.group(0))
-        elif dpat.search(line):
-            for i in range(Nbin):
-                try:
-                    dat[iaz, :, i] = list(map(float, line[1:-2].split()))
-                except ValueError:
-                    print(iaz, i)
-                    print(line)
-                    raise
-                if i < Nbin - 1:
-                    line = f.readline()
-        else:
-            raise ValueError(f"unexpected raw data\n{line}")
+    dat = np.empty((Naz, Nel, Nbin), dtype=np.uint8)
 
-with h5py.File(fnout, "w") as f:
-    f["/data"] = dat
+    bpat = re.compile(r"(?<=azimuth_bin\=)\d+")
+    dpat = re.compile(r"(?<=\[)((\d+\s*){20})(?=])")
+
+    iaz = 0
+    i = 0
+    with open(filename) as f:
+        for line in f:
+            if m := bpat.search(line):
+                iaz = int(m.group(0))
+            elif dpat.search(line):
+                for i in range(Nbin):
+                    try:
+                        dat[iaz, :, i] = list(map(float, line[1:-2].split()))
+                    except ValueError:
+                        print(iaz, i)
+                        print(line)
+                        raise
+                    if i < Nbin - 1:
+                        line = f.readline()
+            else:
+                raise ValueError(f"unexpected raw data:\n{line}")
+
+    return dat
+
+
+def write_hdf5(data: np.ndarray, filename: Path):
+    """
+    write data to HDF5 file
+    """
+
+    with h5py.File(filename, "w") as f:
+        f["/data"] = data
+
+
+if __name__ == "__main__":
+    P = argparse.ArgumentParser(description="Load instrument text data and convert to HDF5")
+    P.add_argument("fn", help="path to ASCII data file")
+    p = P.parse_args()
+
+    file_in = Path(p.fn).expanduser()
+    file_out = file_in.with_suffix(".h5")
+
+    data = read_text(file_in)
+    write_hdf5(data, file_out)
