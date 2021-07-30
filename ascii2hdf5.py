@@ -13,6 +13,7 @@ HDF5 file is 27.6kB uncompressed--a little fixed overhead due to HDF5 internal s
 Expected raw data size would be 20 * 20 * 64 * 1 bytes = 25.6 kB
 """
 
+from __future__ import annotations
 import argparse
 from pathlib import Path
 import re
@@ -45,26 +46,34 @@ def read_text(filename: Path) -> np.ndarray:
                 iaz = int(m.group(0))
             elif dpat.search(line):
                 for i in range(Nbin):
-                    d = list(map(float, line.replace("[", "").replace("]", "").split()))
+                    d = text2list(line)
                     if len(d) == 0:
                         raise ValueError(f"empty data line at {iaz}, {i}")
                     if len(d) < Nel:
                         # data fragmented onto next line, join together
                         # assumes that data isn't broken over more than 2 lines
-                        line = f.readline().replace("[", "").replace("]", "")
-                        d2 = list(map(float, line.split()))
-                        d.extend(d2)
+                        line = f.readline()
+                        d.extend(text2list(line))
                     if len(d) != Nel:
                         raise ValueError(f"incorrect data line(s) near {iaz}, {i}\n{line}")
-
+                    # data line length is now correct
                     dat[iaz, :, i] = d
 
                     if i < Nbin - 1:
-                        line = f.readline().replace("[", "").replace("]", "")
+                        line = f.readline()
             else:
                 raise ValueError(f"unexpected raw data:\n{line}")
 
     return dat
+
+
+def drop_brackets(s: str) -> str:
+    return s.replace("[", "").replace("]", "")
+
+
+def text2list(line: str) -> list[float]:
+
+    return list(map(float, drop_brackets(line).split()))
 
 
 def write_hdf5(data: np.ndarray, filename: Path):
