@@ -45,12 +45,19 @@ def read_text(filename: Path) -> np.ndarray:
                 iaz = int(m.group(0))
             elif dpat.search(line):
                 for i in range(Nbin):
-                    try:
-                        dat[iaz, :, i] = list(map(float, line[1:-2].split()))
-                    except ValueError:
-                        print(iaz, i)
-                        print(line)
-                        raise
+                    d = list(map(float, line[1:-2].split()))
+                    if len(d) == 0:
+                        raise ValueError(f"empty data line at {iaz}, {i}")
+                    if len(d) < Nel:
+                        # data fragmented onto next line, join together
+                        line = f.readline()
+                        d2 = list(map(float, line[:-2].split()))
+                        d.extend(d2)
+                    if len(d) != Nel:
+                        raise ValueError(f"incorrect data line(s) near {iaz}, {i}")
+
+                    dat[iaz, :, i] = d
+
                     if i < Nbin - 1:
                         line = f.readline()
             else:
@@ -75,18 +82,20 @@ if __name__ == "__main__":
 
     file_in = Path(p.path).expanduser()
     if file_in.is_dir():
-        files = [
-            file
-            for file in file_in.iterdir()
-            if file.suffix == ".txt" and not file_in.with_suffix(".h5").is_file()
-        ]
+        files = sorted(
+            [
+                file
+                for file in file_in.iterdir()
+                if file.suffix == ".txt" and not file_in.with_suffix(".h5").is_file()
+            ]
+        )
         if not files:
             raise FileNotFoundError(file_in)
         for file in files:
-            file_out = file_in.with_suffix(".h5")
-            print(f"{file_in} => {file_out}")
-            data = read_text(file_in)
-            write_hdf5(data, file_in.with_suffix(".hdf5"))
+            file_out = file.with_suffix(".h5")
+            print(f"{file} => {file_out}")
+            data = read_text(file)
+            write_hdf5(data, file_out)
     elif file_in.is_file():
         write_hdf5(read_text(file_in), file_in.with_suffix(".h5"))
     else:
