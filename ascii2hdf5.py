@@ -45,21 +45,21 @@ def read_text(filename: Path) -> np.ndarray:
                 iaz = int(m.group(0))
             elif dpat.search(line):
                 for i in range(Nbin):
-                    d = list(map(float, line[1:-2].split()))
+                    d = list(map(float, line.replace("[", "").replace("]", "").split()))
                     if len(d) == 0:
                         raise ValueError(f"empty data line at {iaz}, {i}")
                     if len(d) < Nel:
                         # data fragmented onto next line, join together
-                        line = f.readline()
-                        d2 = list(map(float, line[:-2].split()))
+                        line = f.readline().replace("[", "").replace("]", "")
+                        d2 = list(map(float, line.split()))
                         d.extend(d2)
                     if len(d) != Nel:
-                        raise ValueError(f"incorrect data line(s) near {iaz}, {i}")
+                        raise ValueError(f"incorrect data line(s) near {iaz}, {i}\n{line}")
 
                     dat[iaz, :, i] = d
 
                     if i < Nbin - 1:
-                        line = f.readline()
+                        line = f.readline().replace("[", "").replace("]", "")
             else:
                 raise ValueError(f"unexpected raw data:\n{line}")
 
