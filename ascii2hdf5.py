@@ -70,11 +70,24 @@ def write_hdf5(data: np.ndarray, filename: Path):
 
 if __name__ == "__main__":
     P = argparse.ArgumentParser(description="Load instrument text data and convert to HDF5")
-    P.add_argument("fn", help="path to ASCII data file")
+    P.add_argument("path", help="path (or directory to iterate) to ASCII data file")
     p = P.parse_args()
 
-    file_in = Path(p.fn).expanduser()
-    file_out = file_in.with_suffix(".h5")
-
-    data = read_text(file_in)
-    write_hdf5(data, file_out)
+    file_in = Path(p.path).expanduser()
+    if file_in.is_dir():
+        files = [
+            file
+            for file in file_in.iterdir()
+            if file.suffix == ".txt" and not file_in.with_suffix(".h5").is_file()
+        ]
+        if not files:
+            raise FileNotFoundError(file_in)
+        for file in files:
+            file_out = file_in.with_suffix(".h5")
+            print(f"{file_in} => {file_out}")
+            data = read_text(file_in)
+            write_hdf5(data, file_in.with_suffix(".hdf5"))
+    elif file_in.is_file():
+        write_hdf5(read_text(file_in), file_in.with_suffix(".h5"))
+    else:
+        raise FileNotFoundError(file_in)
