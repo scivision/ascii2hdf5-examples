@@ -50,6 +50,7 @@ def read_text(filename: Path) -> np.ndarray:
                         raise ValueError(f"empty data line at {iaz}, {i}")
                     if len(d) < Nel:
                         # data fragmented onto next line, join together
+                        # assumes that data isn't broken over more than 2 lines
                         line = f.readline().replace("[", "").replace("]", "")
                         d2 = list(map(float, line.split()))
                         d.extend(d2)
@@ -68,7 +69,7 @@ def read_text(filename: Path) -> np.ndarray:
 
 def write_hdf5(data: np.ndarray, filename: Path):
     """
-    write data to HDF5 file
+    write data to HDF5 file (uncompressed)
     """
 
     with h5py.File(filename, "w") as f:
