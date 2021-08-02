@@ -18,10 +18,10 @@ import argparse
 from pathlib import Path
 import re
 import numpy as np
-import h5py
+import xarray
 
 
-def read_text(filename: Path) -> np.ndarray:
+def read_text(filename: Path) -> xarray.DataArray:
     """
     read ASCII data from file
     """
@@ -29,11 +29,21 @@ def read_text(filename: Path) -> np.ndarray:
     # a priori
     Nel = 20
     Naz = 20
-    Nbin = 64
+    Nspeed = 64
+    boundsAz = (-32.0, 32.0)
+    boundsSpeed = (0.0, 20.0)
+    boundsEl = (-32.0, 32.0)
 
     filename = Path(filename).expanduser()
 
-    dat = np.empty((Naz, Nel, Nbin), dtype=np.uint8)
+    dat = xarray.DataArray(
+        coords={
+            "azimuth": np.linspace(*boundsAz, Naz, dtype=np.float32),
+            "speed": np.linspace(*boundsSpeed, Nspeed, dtype=np.float32),
+            "elevation": np.linspace(*boundsEl, Nel, dtype=np.float32),
+        },
+        dims=["azimuth", "speed", "elevation"],
+    ).astype(np.uint8)
 
     bpat = re.compile(r"(?<=azimuth_bin\=)\d+")
     dpat = re.compile(r"(?<=\[)((\d+\s*){20})(?=])")
@@ -45,7 +55,7 @@ def read_text(filename: Path) -> np.ndarray:
             if m := bpat.search(line):
                 iaz = int(m.group(0))
             elif dpat.search(line):
-                for i in range(Nbin):
+                for i in range(Nspeed):
                     d = text2list(line)
                     if len(d) == 0:
                         raise ValueError(f"empty data line at {iaz}, {i}")
@@ -57,9 +67,10 @@ def read_text(filename: Path) -> np.ndarray:
                     if len(d) != Nel:
                         raise ValueError(f"incorrect data line(s) near {iaz}, {i}\n{line}")
                     # data line length is now correct
-                    dat[iaz, :, i] = d
+                    dat[iaz, i, :] = np.array(d).astype(np.uint8)
+                    # this azimuth "page", this speed, Nel elevations
 
-                    if i < Nbin - 1:
+                    if i < Nspeed - 1:
                         line = f.readline()
             else:
                 raise ValueError(f"unexpected raw data:\n{line}")
@@ -76,15 +87,6 @@ def text2list(line: str) -> list[float]:
     return list(map(float, drop_brackets(line).split()))
 
 
-def write_hdf5(data: np.ndarray, filename: Path):
-    """
-    write data to HDF5 file (uncompressed)
-    """
-
-    with h5py.File(filename, "w") as f:
-        f["/data"] = data
-
-
 if __name__ == "__main__":
     P = argparse.ArgumentParser(description="Load instrument text data and convert to HDF5")
     P.add_argument("path", help="path (or directory to iterate) to ASCII data file")
@@ -96,17 +98,16 @@ if __name__ == "__main__":
             [
                 file
                 for file in file_in.iterdir()
-                if file.suffix == ".txt" and not file_in.with_suffix(".h5").is_file()
+                if file.suffix == ".txt" and not file_in.with_suffix(".nc").is_file()
             ]
         )
         if not files:
             raise FileNotFoundError(file_in)
         for file in files:
-            file_out = file.with_suffix(".h5")
+            file_out = file.with_suffix(".nc")
             print(f"{file} => {file_out}")
-            data = read_text(file)
-            write_hdf5(data, file_out)
+            read_text(file).to_netcdf(file_out, mode="w", format="NETCDF4")
     elif file_in.is_file():
-        write_hdf5(read_text(file_in), file_in.with_suffix(".h5"))
+        read_text(file_in).to_netcdf(file_in.with_suffix(".nc"), mode="w", format="NETCDF4")
     else:
         raise FileNotFoundError(file_in)
