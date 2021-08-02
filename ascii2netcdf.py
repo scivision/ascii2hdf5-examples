@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-loads text data and converts to HDF5
+loads text data and converts to NetCDF4
 assumes data is unsigned integer 8bit (uint8)
 
 Michael Hirsch
@@ -8,7 +8,8 @@ Michael Hirsch
 Python >= 3.8
 
 ASCII data is ~60kB as this is inefficient way to store data.
-HDF5 file is 27.6kB uncompressed--a little fixed overhead due to HDF5 internal structure.
+HDF5 file is 27.6kB uncompressed--overhead due to HDF5 internal structure.
+NetCDF4 file is ~ 35kB uncompressed due to additional overhead of NetCDF4 axes and metadata.
 
 Expected raw data size would be 20 * 20 * 64 * 1 bytes = 25.6 kB
 """
